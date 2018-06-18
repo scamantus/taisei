@@ -331,7 +331,7 @@ static bool collision_laser_curve(Laser *l) {
 			float f = lineseg_circle_intersect(segment, collision_area);
 
 			if(f >= 0) {
-				player_graze(&global.plr, segment.a + f * (segment.b - segment.a), 7, 5);
+				player_graze(&global.plr, NULL, segment.a + f * (segment.b - segment.a), 7, 5);
 				grazed = true;
 			}
 		}

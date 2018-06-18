@@ -19,6 +19,7 @@
 #include "aniplayer.h"
 #include "resource/animation.h"
 #include "entity.h"
+#include "score.h"
 
 enum {
 	PLR_MAX_POWER = 400,
@@ -98,6 +99,7 @@ struct Player {
 
 	bool iddqd;
 
+	ScoreState scorestate;
 #ifdef PLR_DPS_STATS
 	int dmglogframe;
 	int dmglog[240];
@@ -142,7 +144,8 @@ void player_move(Player*, complex delta);
 
 void player_realdeath(Player*);
 void player_death(Player*);
-void player_graze(Player *plr, complex pos, int pts, int effect_intensity);
+
+void player_graze(Player *plr, Projectile *p, complex pos, int pts, int effect_intensity); // p is the grazed Projectile or NULL if something else was grazed.
 
 void player_event(Player *plr, uint8_t type, uint16_t value, bool *out_useful, bool *out_cheat);
 bool player_event_with_replay(Player *plr, uint8_t type, uint16_t value);

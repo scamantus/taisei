@@ -14,6 +14,7 @@
 #include "global.h"
 #include "list.h"
 #include "stageobjects.h"
+#include "score.h"
 
 static ProjArgs defaults_proj = {
 	.sprite = "proj/",
@@ -401,9 +402,9 @@ void apply_projectile_collision(ProjectileList *projlist, Projectile *p, ProjCol
 
 		case PCOL_PLAYER_GRAZE: {
 			if(p->flags & PFLAG_GRAZESPAM) {
-				player_graze(col->entity, col->location, 10, 2);
+				player_graze(col->entity, p, col->location, 10, 2);
 			} else {
-				player_graze(col->entity, col->location, 10 + 10 * p->graze_counter, 3 + p->graze_counter);
+				player_graze(col->entity, p, col->location, 10 + 10 * p->graze_counter, 3 + p->graze_counter);
 			}
 
 			p->graze_counter++;
@@ -444,7 +445,8 @@ void apply_projectile_collision(ProjectileList *projlist, Projectile *p, ProjCol
 
 static void ent_draw_projectile(EntityInterface *ent) {
 	Projectile *proj = ENT_CAST(ent, Projectile);
-
+	if(proj->type == EnemyProj)
+		score_state_highlight_that_bullet(&global.plr.scorestate,proj);
 	// TODO: get rid of these legacy flags
 
 	if(proj->flags & PFLAG_DRAWADD) {

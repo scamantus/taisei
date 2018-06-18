@@ -88,6 +88,7 @@ taisei_src = files(
     'transition.c',
     'version.c',
     'video.c',
+    'score.c',
 )
 
 sse42_src = []

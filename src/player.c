@@ -25,6 +25,8 @@ void player_init(Player *plr) {
 	plr->deathtime = -1;
 	plr->continuetime = -1;
 	plr->mode = plrmode_find(0, 0);
+
+	score_state_create(&plr->scorestate);
 }
 
 void player_stage_pre_init(Player *plr) {
@@ -74,6 +76,7 @@ void player_free(Player *plr) {
 	aniplayer_free(&plr->ani);
 	ent_unregister(&plr->ent);
 	delete_enemy(&plr->focus_circle, plr->focus_circle.first);
+	score_state_free(&plr->scorestate);
 }
 
 static void player_full_power(Player *plr) {
@@ -147,6 +150,8 @@ static void ent_draw_player(EntityInterface *ent) {
 		.pos = { creal(plr->pos), cimag(plr->pos) },
 		.color = c,
 	});
+	score_state_draw(&plr->scorestate,1);
+
 }
 
 static int player_focus_circle_logic(Enemy *e, int t) {
@@ -867,7 +872,7 @@ void player_fix_input(Player *plr) {
 	}
 }
 
-void player_graze(Player *plr, complex pos, int pts, int effect_intensity) {
+void player_graze(Player *plr, Projectile *p, complex pos, int pts, int effect_intensity) {
 	if(!(++plr->graze)) {
 		log_warn("Graze counter overflow");
 		plr->graze = 0xffff;
@@ -889,6 +894,10 @@ void player_graze(Player *plr, complex pos, int pts, int effect_intensity) {
 			.flags = PFLAG_NOREFLECT,
 			.layer = LAYER_PARTICLE_LOW,
 		);
+	}
+
+	if(p != NULL) {
+		score_state_graze(&plr->scorestate,p);
 	}
 }
 
