@@ -212,6 +212,8 @@ static int reimu_spirit_bomb_orb(Projectile *p, int t) {
 				.flags = PFLAG_NOREFLECT,
 			);
 		}
+
+		stage_clear_hazards_at(p->pos, 256, CLEAR_HAZARDS_ALL | CLEAR_HAZARDS_NOW);
 	}
 
 	if(t < 0) {

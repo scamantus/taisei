@@ -24,7 +24,7 @@ static struct {
 
 void ent_init(void) {
 	memset(&entities, 0, sizeof(entities));
-	entities.capacity = 4096;
+	entities.capacity = 1;
 	entities.array = calloc(entities.capacity, sizeof(EntityInterface*));
 }
 
@@ -37,6 +37,7 @@ void ent_shutdown(void) {
 		ent_unregister(ent);
 	}
 
+	assert(entities.num == 0);
 	free(entities.array);
 }
 
@@ -53,8 +54,8 @@ void ent_register(EntityInterface *ent, EntityType type) {
 		log_debug("spawn_id just overflowed. You might be spawning stuff waaaay too often");
 	}
 
-	if(entities.capacity < entities.num) {
-		entities.capacity *= 2;
+	while(entities.capacity < entities.num) {
+		entities.capacity += 1; // *= 2;
 		entities.array = realloc(entities.array, entities.capacity * sizeof(EntityInterface*));
 	}
 
@@ -62,10 +63,15 @@ void ent_register(EntityInterface *ent, EntityType type) {
 
 	assert(ent->index < entities.num);
 	assert(entities.array[ent->index] == ent);
+
+	FOR_EACH_ENT(ent) {
+		assert(entities.array[ent->index] == ent);
+	}
 }
 
 void ent_unregister(EntityInterface *ent) {
 	EntityInterface *sub = entities.array[--entities.num];
+	log_debug("%i %i", ent->index, entities.num);
 	assert(ent->index <= entities.num);
 	assert(entities.array[ent->index] == ent);
 	entities.array[sub->index = ent->index] = sub;

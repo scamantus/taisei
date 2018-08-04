@@ -504,6 +504,13 @@ void process_projectiles(ProjectileList *projlist, bool collision) {
 		proj->prevpos = proj->pos;
 		action = proj_call_rule(proj, global.frames - proj->birthtime);
 
+		// NOTE: Corner case. This must be set after proj_call_rule,
+		// because the rule might have despawned the next projectile in the list.
+		if(next != proj->next) {
+			log_fatal("despawned next proj");
+			next = proj->next;
+		}
+
 		if(proj->graze_counter && proj->graze_counter_reset_timer - global.frames <= -90) {
 			proj->graze_counter--;
 			proj->graze_counter_reset_timer = global.frames;
