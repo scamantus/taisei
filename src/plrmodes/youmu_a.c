@@ -355,8 +355,13 @@ static void youmu_mirror_shot(Player *plr) {
 }
 
 static int youmu_split(Enemy *e, int t) {
-	if(t < 0)
-		return 1;
+	if(t == EVENT_DEATH) {
+		return ACTION_ACK;
+	}
+
+	if(t == EVENT_DEATH) {
+		return ACTION_ACK;
+	}
 
 	if(!player_is_bomb_active(&global.plr)) {
 		return ACTION_DESTROY;
@@ -365,22 +370,16 @@ static int youmu_split(Enemy *e, int t) {
 	MYON->pos = e->pos;
 	complex myonpos = MYON->pos;
 
-	float m = max(1e-5, 1 - player_get_bomb_progress(&global.plr, 0));
-	e->pos += e->args[0] * 30;
-	e->args[0] *= 0.999;
+	e->pos += e->args[0];
+	complex aim = (global.plr.pos - e->pos) * 0.01;
+	double accel_max = 1;
 
+	if(cabs(aim) > accel_max) {
+		aim *= accel_max / cabs(aim);
+	}
 
-	if((creal(e->pos) < 0 && creal(e->args[0]) < 0)
-           || (creal(e->pos) > VIEWPORT_W && creal(e->args[0]) > 0)) {
-		e->args[0] = -creal(e->args[0]) + I * cimag(e->args[0]);
-		e->args[0] *= 0.8 * cexp(I*0.1*nfrand());
-	} 
-	
-	if((cimag(e->pos) < 0 && cimag(e->args[0]) < 0)
-           || (cimag(e->pos) > VIEWPORT_H && cimag(e->args[0]) > 0)) {
-		e->args[0] = -I*cimag(e->args[0]) + creal(e->args[0]);
-		e->args[0] *= 0.8 * cexp(I * 0.1 * nfrand());
-	} 
+	e->args[0] += aim;
+	e->args[0] *= 1.0 - cabs(global.plr.pos - e->pos) * 0.0001;
 
 	TIMER(&t);
 	FROM_TO(0, 240, 1) {
@@ -405,15 +404,15 @@ static int youmu_split(Enemy *e, int t) {
 			.color = RGBA(0.2, 0.1, 1.0, 0.0),
 			.timeout = 50,
 			.args = {
-				-1*e->args[0]*cexp(I*0.2*nfrand()),
-				0.1*e->args[0]*I*sin(t/4.),
+				-1*e->args[0]*cexp(I*0.2*nfrand())/30,
+				0.1*e->args[0]*I*sin(t/4.)/30,
 				2
 			},
 			.flags = _i%2 == 0 ? PFLAG_REQUIREDPARTICLE : 0
 		);
 	}
 
-	float range = 100;
+	float range = 200;
 	ent_area_damage(myonpos, range, &(DamageInfo){250, DMG_PLAYER_BOMB});
 	stage_clear_hazards_at(myonpos, range, CLEAR_HAZARDS_ALL | CLEAR_HAZARDS_NOW);
 
@@ -438,7 +437,7 @@ static void youmu_mirror_shader(Framebuffer *fb) {
 
 static void youmu_mirror_bomb(Player *plr) {
 	play_sound("bomb_youmu_b");
-	create_enemy_p(&plr->slaves, MYON->pos, ENEMY_BOMB, NULL, youmu_split, -cexp(I*carg(MYON->args[0])), 0, 0, 0);
+	create_enemy_p(&plr->slaves, MYON->pos, ENEMY_BOMB, NULL, youmu_split, -cexp(I*carg(MYON->args[0])) * 30, 0, 0, 0);
 }
 
 static void youmu_mirror_init(Player *plr) {
