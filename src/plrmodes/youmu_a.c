@@ -460,8 +460,9 @@ static void youmu_mirror_preload(void) {
 	NULL);
 
 	preload_resources(RES_SHADER_PROGRAM, flags,
-		"youmua_bomb",
 		"sprite_youmu_myon_shot",
+		"youmu_bomb_bg",
+		"youmua_bomb",
 	NULL);
 
 	preload_resources(RES_SFX, flags | RESF_OPTIONAL,
