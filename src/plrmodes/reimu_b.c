@@ -12,20 +12,34 @@
 #include "plrmodes.h"
 #include "reimu.h"
 #include "stagedraw.h"
+#include "util/glm.h"
 
 #define GAP_LENGTH 128
 #define GAP_WIDTH 16
+
 #define GAP_OFFSET 8
 #define GAP_LIMIT 10
-
-// #define GAP_LENGTH 160
-// #define GAP_WIDTH 160
-// #define GAP_OFFSET 82
 
 #define NUM_GAPS 4
 #define FOR_EACH_GAP(gap) for(Enemy *gap = global.plr.slaves.first; gap; gap = gap->next) if(gap->logic_rule == reimu_dream_gap)
 
 static Enemy *gap_renderer;
+static VertexArray *gap_varray;
+static VertexBuffer *gap_vbuffer;
+
+typedef struct GapRenderAttribs {
+	struct {
+		float pos_x;
+		float pos_y;
+		float view_x;
+		float view_y;
+	} coords;
+
+	struct {
+		float current;
+		float linked;
+	} angles;
+} GapRenderAttribs;
 
 static complex reimu_dream_gap_target_pos(Enemy *e) {
 	double x, y;
@@ -187,37 +201,40 @@ static void reimu_dream_gap_renderer_visual(Enemy *e, int t, bool render) {
 		return;
 	}
 
-	float gaps[NUM_GAPS][2];
-	float angles[NUM_GAPS];
-	int links[NUM_GAPS];
-
-	int i = 0;
-	FOR_EACH_GAP(gap) {
-		gaps[i][0] = creal(gap->pos);
-		gaps[i][1] = cimag(gap->pos);
-		angles[i] = carg(gap->pos0);
-		links[i] = cimag(reimu_dream_gap_get_linked(gap)->args[3]);
-		++i;
-	}
-
 	FBPair *framebuffers = stage_get_fbpair(FBPAIR_FG);
 
 	fbpair_swap(framebuffers);
-	Framebuffer *target_fb = framebuffers->back;
-
-	// This change must propagate
-	r_state_pop();
-	r_framebuffer(target_fb);
-	r_state_push();
+	r_framebuffer(framebuffers->back);
+	r_shader_standard();
+	draw_framebuffer_tex(framebuffers->front, VIEWPORT_W, VIEWPORT_H);
+	fbpair_swap(framebuffers);
+	r_framebuffer(framebuffers->back);
 
 	r_shader("reimu_gap");
-	r_uniform_vec2("viewport", VIEWPORT_W, VIEWPORT_H);
+
+	r_vertex_buffer_invalidate(gap_vbuffer);
+	SDL_RWops *stream = r_vertex_buffer_get_stream(gap_vbuffer);
+
+	r_uniform_sampler("tex", r_framebuffer_get_attachment(framebuffers->front, FRAMEBUFFER_ATTACH_COLOR0));
 	r_uniform_float("time", t / (float)FPS);
-	r_uniform_vec2("gap_size", GAP_WIDTH/2.0, GAP_LENGTH/2.0);
-	r_uniform_vec2_array("gaps[0]", 0, NUM_GAPS, gaps);
-	r_uniform_float_array("gap_angles[0]", 0, NUM_GAPS, angles);
-	r_uniform_int_array("gap_links[0]", 0, NUM_GAPS, links);
-	draw_framebuffer_tex(framebuffers->front, VIEWPORT_W, VIEWPORT_H);
+	r_uniform_vec2("viewport", VIEWPORT_W, VIEWPORT_H);
+	r_uniform_vec2("gap_size", GAP_LENGTH, GAP_WIDTH);
+
+	FOR_EACH_GAP(gap) {
+		GapRenderAttribs attrs = { 0 };
+		Enemy *linked_gap = reimu_dream_gap_get_linked(gap);
+
+		attrs.coords.pos_x = creal(gap->pos);
+		attrs.coords.pos_y = cimag(gap->pos);
+		attrs.coords.view_x = creal(linked_gap->pos);
+		attrs.coords.view_y = cimag(linked_gap->pos);
+		attrs.angles.current = carg(gap->pos0) - M_PI/2;
+		attrs.angles.linked = carg(linked_gap->pos0) - M_PI/2;
+
+		SDL_RWwrite(stream, &attrs, sizeof(attrs), 1);
+	}
+
+	r_draw(gap_varray, PRIM_TRIANGLE_STRIP, 0, 4, NUM_GAPS, 0);
 
 	FOR_EACH_GAP(gap) {
 		r_mat_push();
@@ -560,6 +577,41 @@ static void reimu_dream_init(Player *plr) {
 
 	reimu_dream_respawn_slaves(plr, plr->power);
 	reimu_common_bomb_buffer_init();
+
+	size_t sz_vert = sizeof(GenericModelVertex);
+	size_t sz_attr = sizeof(GapRenderAttribs);
+
+	#define VERTEX_OFS(attr)   offsetof(GenericModelVertex,  attr)
+	#define INSTANCE_OFS(attr) offsetof(GapRenderAttribs, attr)
+
+	VertexAttribFormat fmt[] = {
+		// Per-vertex attributes (for the static models buffer, bound at 0)
+		{ { 3, VA_FLOAT, VA_CONVERT_FLOAT, 0 }, sz_vert, VERTEX_OFS(position),       0 },
+		{ { 3, VA_FLOAT, VA_CONVERT_FLOAT, 0 }, sz_vert, VERTEX_OFS(normal),         0 },
+		{ { 2, VA_FLOAT, VA_CONVERT_FLOAT, 0 }, sz_vert, VERTEX_OFS(uv),             0 },
+
+		// Per-instance attributes (for our own buffer, bound at 1)
+		{ { 4, VA_FLOAT, VA_CONVERT_FLOAT, 1 }, sz_attr, INSTANCE_OFS(coords),       1 },
+		{ { 2, VA_FLOAT, VA_CONVERT_FLOAT, 1 }, sz_attr, INSTANCE_OFS(angles),       1 },
+	};
+
+	gap_varray = r_vertex_array_create();
+	r_vertex_array_set_debug_label(gap_varray, "ReimuB gaps vertex array");
+
+	gap_vbuffer = r_vertex_buffer_create(NUM_GAPS * sizeof(GapRenderAttribs), NULL);
+	r_vertex_buffer_set_debug_label(gap_vbuffer, "ReimuB gaps vertex buffer");
+
+	r_vertex_array_attach_vertex_buffer(gap_varray, r_vertex_buffer_static_models(), 0);
+	r_vertex_array_attach_vertex_buffer(gap_varray, gap_vbuffer, 1);
+	r_vertex_array_layout(gap_varray, sizeof(fmt)/sizeof(*fmt), fmt);
+}
+
+static void reimu_dream_free(Player *plr) {
+	r_vertex_array_destroy(gap_varray);
+	gap_varray = NULL;
+
+	r_vertex_buffer_destroy(gap_vbuffer);
+	gap_vbuffer = NULL;
 }
 
 PlayerMode plrmode_reimu_b = {
@@ -574,6 +626,7 @@ PlayerMode plrmode_reimu_b = {
 		.shot = reimu_dream_shot,
 		.power = reimu_dream_power,
 		.init = reimu_dream_init,
+		.free = reimu_dream_free,
 		.preload = reimu_dream_preload,
 		.think = reimu_dream_think,
 	},

@@ -9,6 +9,9 @@
 #ifdef VERT_STAGE
 ATTRIBUTE(0) vec3 position;
 ATTRIBUTE(2) vec2 texCoordRawIn;
+
+ATTRIBUTE(3) vec4 gapCoords;
+ATTRIBUTE(4) vec2 gapAngles;
 #endif
 
 #ifdef FRAG_STAGE
@@ -16,15 +19,11 @@ OUT(0) vec4 fragColor;
 #endif
 
 UNIFORM(0) sampler2D tex;
-UNIFORM(1) vec2 viewport;
-UNIFORM(2) float time;
+UNIFORM(1) float time;
+UNIFORM(2) vec2 viewport;
 UNIFORM(3) vec2 gap_size;
-UNIFORM(4) vec2 gaps[NUM_GAPS];
-UNIFORM(8) float gap_angles[NUM_GAPS];
-UNIFORM(12) int gap_links[NUM_GAPS];
 
 VARYING(0) vec2 texCoord;
-VARYING(1) vec2 gap_views[NUM_GAPS];
-VARYING(5) mat2 gap_rotations[NUM_GAPS];
+VARYING(1) vec2 texCoordGapView;
 
 #endif
